@@ -1,8 +1,6 @@
 ---
 title: "Obviously density matters for neural networks"
-format:
-    html:
-        embed-resources: true
+format: html
 ---
 
 ```{python}
