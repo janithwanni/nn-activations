@@ -1,0 +1,331 @@
+---
+title: "Obviously density matters for neural networks"
+format:
+    html:
+        embed-resources: true
+---
+
+```{python}
+#| echo: false
+import plotnine as pl
+```
+
+```{python}
+#| echo: false
+
+import numpy as np
+import random
+import matplotlib.pyplot as plt
+from itertools import product
+
+def decision_boundary(x, p, h):
+    mod_wave = np.abs((x % p) - p / 2)  # Triangular wave function
+    return x + h * np.sign(np.sin(2 * np.pi * x / p)) * mod_wave
+
+def sample(x, size, replace = True):
+    return x[np.random.choice(x.shape[0], size, replace = replace), :]
+
+def create_data(n_samples=100, lower=-10, upper=10, p=10, h=0.75, margin = 2, sample_prob = 0.1):
+    x = np.linspace(lower, upper, round(np.sqrt(n_samples)))
+    D = np.array(list(product(x, x)))
+
+    unit_vector = np.array([-1, 1]) / np.sqrt(2)
+
+    up_f = decision_boundary(D[:, 0] + margin * unit_vector[1],p,h)
+    down_f = decision_boundary(D[:,0] - margin * unit_vector[1],p,h)
+
+    mid = D[((D[:,1] > down_f) & (D[:,1] < up_f)), ]
+    not_mid = D[~((D[:,1] > down_f) & (D[:,1] < up_f)), ]
+
+    if(sample_prob != 1):
+        trans_D = np.vstack([
+            sample(not_mid, round(not_mid.shape[0] * (1-sample_prob)), replace = False),
+            sample(mid, round(mid.shape[0] * sample_prob), replace=False),
+        ])
+    else:
+        trans_D = D
+    f = decision_boundary(trans_D[:,0], p, h)
+    trans_y = np.select([trans_D[:, 1] < f], [1.0], [0.0])
+    trans_cy = np.select([trans_y == 1.0], ["#f00"], default=["#0f0"])
+
+    return trans_D, trans_y, trans_cy
+```
+
+```{python}
+#| echo: false
+
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+DEVICE = "mps"
+
+class InterpretableNN(nn.Module):
+    def __init__(self, layer_sizes):
+        super(InterpretableNN, self).__init__()
+        self.layer1 = nn.Linear(2, layer_sizes[0])
+        self.activation1 = nn.ReLU()
+        self.layer2 = nn.Linear(layer_sizes[0], layer_sizes[1])
+        self.activation2 = nn.ReLU()
+        self.output = nn.Linear(layer_sizes[1], 1)
+        self.sigmoid = nn.Sigmoid()
+        self.activations = {}
+
+    def forward(self, x):
+        self.activations = {}
+        x = self.layer1(x)        
+        x = self.activation1(x)
+        self.activations["h1"] = x
+        
+        x = self.layer2(x)
+        x = self.activation2(x)
+        self.activations["h2"] = x
+        
+        x = self.output(x)
+        x = self.sigmoid(x)
+        return x
+
+def run_model(X, y, epochs = 100, layer_sizes = [4, 4], torch_seed = 123):
+    torch.manual_seed(torch_seed)
+    X_tensor = torch.tensor(X, dtype=torch.float32, device = DEVICE)
+    y_tensor = torch.tensor(y, dtype=torch.float32, device = DEVICE).unsqueeze(1)
+    dataset = torch.utils.data.TensorDataset(X_tensor, y_tensor)
+
+    dataloader = torch.utils.data.DataLoader(
+        dataset,
+        batch_size=32,
+        shuffle=True
+    )
+
+    # Define model
+    model = InterpretableNN(layer_sizes=layer_sizes)
+    model.to(DEVICE)
+    criterion = nn.BCELoss()
+    optimizer = optim.Adam(model.parameters(), lr=0.01)
+
+    for epoch in range(epochs):
+        for batch_X, batch_y in dataloader:
+            predictions = model(batch_X)
+            # circuit_history.append(circuits)
+            loss = criterion(predictions, batch_y)
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+    return model
+
+def model_boundary(model, n_samples=80, lower=-10, upper=10):
+    x = np.linspace(lower, upper, n_samples)
+    X = np.array(list(product(x,x)))
+    X_tensor = torch.tensor(X, dtype=torch.float32, device = DEVICE)
+    preds = model(X_tensor)
+    
+    plt.figure(figsize=(8, 8))
+    plt.scatter(X[:,0], X[:,1], c=(preds.cpu().detach().numpy() > 0.5).astype(int), alpha=0.6, cmap=plt.cm.RdYlBu, s=8)
+    plt.title("Decision Boundary")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True)
+    plt.show()
+```
+
+
+We have two questions that we need to have answered
+
+1. How does the model boundary change as the,
+    a. distance between the two side changes
+    b. the number of jags changes
+    c. the number of hidden layer neurons 
+2. What are the activations of each weight in each layer for the entire data space
+3. How many neurons are activated at the same time for the entire data space
+4. (optional) How do the activations change through each epoch?
+
+### 1.a. 
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 10, margin=1, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10)
+model_boundary(model)
+```
+
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 10, margin=5, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10)
+model_boundary(model)
+```
+
+### 1.b.
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 10, margin=2, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10)
+model_boundary(model)
+```
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 2, margin=2, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10)
+model_boundary(model)
+```
+
+### 1.c
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 5, margin=5, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10, layer_sizes=[4,4])
+model_boundary(model)
+```
+
+```{python}
+model = run_model(data, y, epochs=10, layer_sizes=[16,16])
+model_boundary(model)
+```
+
+### 2.
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 10, margin=5, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10, layer_sizes=[4,4])
+model_boundary(model)
+```
+
+```{python}
+def layer_plot(act, layer_size, lower, upper, title, nrows = 1,):
+    fig, axes = plt.subplots(1, layer_size, figsize=(20, 5))
+    for i in range(layer_size):
+        ax = axes[i]
+        ax.imshow(act[:, :, i].cpu().detach().numpy(), 
+                extent=(lower, upper, lower, upper), 
+                origin='lower', 
+                cmap='viridis')
+        ax.set_title(f'Weight {i+1}')
+        ax.set_xlabel('x-axis')
+        ax.set_ylabel('y-axis')
+    fig.suptitle(title)
+    plt.tight_layout()
+    plt.show()
+
+# apply model to the entire data space
+def plot_activations(model, layers = [1,2], layer_size = 4, n_samples = 100, lower = -10, upper = 10):
+    grid_size = round(np.sqrt(n_samples))
+    x = np.linspace(lower, upper, grid_size)
+    D = np.array(list(product(x, x)))
+    D_tensor = torch.tensor(D, dtype=torch.float32, device = DEVICE)
+    Y = model(D_tensor)
+
+    if(1 in layers):
+        h1_act = model.activations["h1"].reshape((grid_size, grid_size, layer_size))
+        layer_plot(h1_act, layer_size=layer_size, lower=lower, upper=upper, title="Layer 1")
+    if(2 in layers):
+        h2_act = model.activations["h2"].reshape((grid_size, grid_size, layer_size))
+        layer_plot(h2_act, layer_size=layer_size, lower=lower, upper=upper, title="Layer 2")
+
+def plot_active_areas(model, layer_size = 4, n_samples = 100, lower = -10, upper = 10):
+    grid_size = round(np.sqrt(n_samples))
+    x = np.linspace(lower, upper, grid_size)
+    D = np.array(list(product(x, x)))
+    D_tensor = torch.tensor(D, dtype=torch.float32, device = DEVICE)
+    Y = model(D_tensor)
+
+    h1_act = model.activations["h1"].reshape((grid_size, grid_size, layer_size))
+    h2_act = model.activations["h2"].reshape((grid_size, grid_size, layer_size))
+
+    summed_activations = (h1_act + h2_act).sum(dim=2)  # Element-wise sum, retains shape (grid_size, grid_size, layer_size)
+
+    # Plot each layer as a 2D heatmap
+    plt.figure(figsize=(8, 8))
+    plt.imshow(summed_activations.cpu().detach().numpy(), extent=(lower, upper, lower, upper), 
+                origin='lower', 
+                cmap='viridis')
+    plt.title("Most active areas")
+    plt.xlabel("Feature 1")
+    plt.ylabel("Feature 2")
+    plt.grid(True)
+    plt.show()
+```
+
+```{python}
+plot_activations(model)
+```
+
+### 3.
+
+This sums up the activations across weights and layers to show which areas in the input space causes all the weights to be active.
+
+```{python}
+plot_active_areas(model)
+```
+
+### 2. and 3. but bigger model
+
+```{python}
+model = run_model(data, y, epochs=10, layer_sizes=[16,16])
+model_boundary(model)
+```
+
+```{python}
+plot_activations(model, layer_size=16)
+```
+
+```{python}
+plot_active_areas(model, layer_size=16)
+```
+
+### 2. and 3. but with bad decision boundary
+
+```{python}
+data, y, cy = create_data(n_samples=5000, p = 10, margin=5, sample_prob = 0.1)
+plt.figure(figsize=(8,8))
+plt.scatter(data[:,0],data[:,1], c=cy,s=3)
+plt.show()
+```
+
+```{python}
+model = run_model(data, y, epochs=10, layer_sizes=[4,4])
+model_boundary(model)
+```
+
+```{python}
+plot_activations(model, layer_size=4)
+```
+
+```{python}
+plot_active_areas(model, layer_size=4)
+```
+
