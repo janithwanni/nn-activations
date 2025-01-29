@@ -1,0 +1,27 @@
+---
+title: "Decision boundary with known importances"
+---
+
+```{python}
+def decision_boundary(x, consts, funcs):
+    if x <= consts[0]:
+        return funcs[0](x)
+    for i in range(1, (len(consts) - 1)):
+        if x > consts[(i-1)] and x <= consts[i]:
+            return funcs[i](x)
+    if x > consts[-1]:
+        return funcs[-1](x)
+```
+
+
+```{python}
+import numpy as np
+import matplotlib.pyplot as plt
+
+consts = [-2, -1, 0, 1, 2]
+funcs = [lambda x: 0.5, lambda x: x + 1, lambda x: -2*x + 1, lambda x: x + 2, lambda x: consts[-1]]
+x = np.linspace(-3, 3, 100)
+y = [decision_boundary(i, consts, funcs) for i in x]
+
+plt.scatter(x, y)
+```

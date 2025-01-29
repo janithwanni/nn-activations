@@ -1,0 +1,84 @@
+---
+title: "New Year, New Me?"
+---
+
+<!-- 
+
+Plot of the story:
+
+Main character:
+
+ -->
+
+
+It's a new year and summer is around the corner. Aleck wanted to join a new gym and there he was given a verdict by the AI system that he can not be accepted into the calisthencis program after entering his height and weight.
+
+He asked for the data and wanted to see how the model actually came to see this decision.
+
+At first he wanted to know how should his weight change for him to be accepted into the calisthenics program? _(this is a discussion into CF that I will not spend time on at the moment)_
+
+But then he got to talk with model developer and together he wanted to solve the problem on why did the model give this verdict to him.
+
+```{python}
+#| echo: false
+{{< include data_gen.py >}}
+```
+
+```{python}
+boundary_params = {"displ": 1, "freq": 0.75, "amp": 2}
+n_samples = 1000
+margin_params = {"margin": 5, "margin_sample": 0.31, "outmargin_sample": 1}
+space_params = {"x_lower": -10, "x_upper": 10, "y_lower": -10, "y_upper": 10}
+overlap = 2
+rotation_angle=45
+
+d = generate_data(n_samples,
+    boundary_params,
+    rotation_angle=rotation_angle,
+    margin_params=margin_params,
+    overlap=overlap,
+    space_params=space_params)
+```
+
+First Aleck and the model developer got to look at the dataset used for the model.
+
+```{python}
+plt.figure(figsize=(8,8))
+plt.scatter(d["x"], d["y"], c = ["red" if v == "A" else "green" for v in d["class"]], s=10)
+px = np.linspace(np.min(d["x"]), np.max(d["x"]), 1000)
+py = decision_boundary(px, d["boundary_params"]["displ"], d["boundary_params"]["freq"], d["boundary_params"]["amp"])
+rx, ry = rotate(px, py, rotation_angle)
+plt.plot(rx, ry, lw=2)
+plt.show()
+```
+
+
+```{python}
+import pandas as pd
+dd = pd.read_csv("train_data.csv")
+```
+
+```{python}
+plt.figure(figsize=(8,8))
+plt.scatter(dd["x"], dd["y"], c = ["red" if v == "A" else "green" for v in dd["class"]], s=10)
+plt.show()
+```
+
+```{python}
+#| echo: false
+{{< include data_model.py >}}
+```
+
+Let's take a look at the model boundary
+
+```{python}
+data = np.vstack([d["x"],d["y"]]).transpose()
+model = run_model(data, np.array([1.0 if v == "A" else 0.0 for v in d["class"]]), epochs=10)
+model_boundary(model)
+```
+
+```{python}
+model = run_model(dd.iloc[:, [0,1]].values, np.array([1.0 if v == "A" else 0.0 for v in dd["class"].values]), epochs=10)
+model_boundary(model)
+```
+
