@@ -2,15 +2,6 @@
 title: "New Year, New Me?"
 ---
 
-<!-- 
-
-Plot of the story:
-
-Main character:
-
- -->
-
-
 It's a new year and summer is around the corner. Aleck wanted to join a new gym and there he was given a verdict by the AI system that he can not be accepted into the calisthencis program after entering his height and weight.
 
 He asked for the data and wanted to see how the model actually came to see this decision.
