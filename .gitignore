@@ -1,2 +1,4 @@
 venv/
 *_files/
+*_site/
+renv/
