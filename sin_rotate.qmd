@@ -1,0 +1,136 @@
+---
+title: "sin wave and rotation"
+filters:
+    - shinylive
+---
+
+```{shinylive-python}
+#| standalone: true
+#| echo: false
+#| viewerHeight: 800
+from shiny import App, ui, render
+import matplotlib.pyplot as plt
+import numpy as np
+
+boundary_params = {"displ": 1, "freq": 1, "amp": 2}
+n_samples = 10000
+margin_params = {"margin": 0, "margin_sample": 1, "outmargin_sample": 1}
+space_params = {"x_lower": -10, "x_upper": 10, "y_lower": -10, "y_upper": 10}
+overlap = 0
+rotation_angle=0
+
+def decision_boundary(x, displ, freq, amp):
+    # print(f"{amp} * np.sin({freq} * x) + {displ}")
+    return amp * np.sin(freq * x) + displ
+
+def rotate(x, y, t):
+    theta = np.radians(t)
+    # Compute center of the plane
+    center_x = (x.max() + x.min()) / 2
+    center_y = (y.max() + y.min()) / 2
+
+    # Create rotation matrix
+    rotation_matrix = np.array([
+        [np.cos(theta), -np.sin(theta)],
+        [np.sin(theta),  np.cos(theta)]
+    ])
+
+    # Shift points to center the plane
+    x_shifted = x - center_x
+    y_shifted = y - center_y
+
+    # Apply the rotation
+    rotated_points = np.dot(rotation_matrix, np.vstack((x_shifted, y_shifted)))
+
+    # Shift points back to the original plane
+    x_rotated = rotated_points[0, :] + center_x
+    y_rotated = rotated_points[1, :] + center_y
+
+    return x_rotated, y_rotated
+
+def plot_data(n_samples, displ, freq, amp, margin, angle):
+    x = np.linspace(-2 * np.pi, 2 * np.pi, 400)
+    y = decision_boundary(x, displ, freq, amp)
+    
+    x_r, y_r = rotate(x,y,angle)
+
+
+    theta = np.radians(angle)
+    # Translate along normal by `distance`
+    x_r_up = x_r + -np.sin(theta) * margin
+    y_r_up = y_r + np.cos(theta) * margin
+
+    x_r_down = x_r + np.sin(theta) * margin
+    y_r_down = y_r - np.cos(theta) * margin
+
+    fig = plt.figure(figsize=(8,8))
+    ax = fig.subplots()
+    ax.scatter(x_r,y_r, c = "black")
+    ax.scatter(x_r_up,y_r_up, c = "brown")
+    ax.scatter(x_r_down,y_r_down, c = "brown")
+    ax.set_xlim([-10,10])
+    ax.set_ylim([-10,10])
+    return fig
+
+"""
+==== UI Section =====
+"""
+app_ui = ui.page_fluid(
+    ui.layout_columns(
+    ui.input_slider(
+        "n_samples",
+        label="Number of samples",
+        min=100,max=10000,step=100,value=500
+    ),
+    ui.input_slider(
+        "displ",
+        label="Displacement",
+        min=0,max=5,step=0.01,value=0
+    ),
+    ui.input_slider(
+        "freq",
+        label="Frequency",
+        min=0,max=5,step=0.01,value=2
+    ),
+    ui.input_slider(
+        "amp",
+        label="Amplitude",
+        min=0,max=5,step=0.01,value=2
+    ),
+    ui.input_slider(
+        "margin",
+        label = "Margin",
+        min=0,max=5,step=0.01,value=1
+    ),
+    ui.input_slider(
+        "angle",
+        label = "Rotation angle",
+        min=0,max=360,step=15,value=45
+    ), col_widths = [2]*6),
+    ui.output_plot(
+        "plot_output",
+        height="80vw", width = "80vw"
+    )
+)
+
+"""
+
+==== Server Section ====
+
+"""
+
+def server(input, output, session):
+    @render.plot
+    def plot_output():
+        return plot_data(
+            n_samples = input.n_samples(),
+            displ = input.displ(),
+            freq = input.freq(),
+            amp = input.amp(),
+            margin = input.margin(),
+            angle = input.angle()
+        )
+    
+app = App(app_ui, server)
+```
+

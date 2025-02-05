@@ -31,7 +31,29 @@ def rotate(x, y, t):
 
     return x_rotated, y_rotated
 
-def generate_data(n_samples, boundary_params, rotation_angle, margin_params, overlap, space_params, seed= 12345):
+def gen_xy(n_samples, space_params, rng, mode = "uniform"):
+    """
+    mode: can be either 'uniform', 'linear', 'normal'
+    """
+    if mode == "uniform":
+        x = rng.uniform(space_params["x_lower"] * 2, space_params["x_upper"] * 2, n_samples*5)
+        y = rng.uniform(space_params["y_lower"] * 2, space_params["y_upper"] * 2, n_samples*5)
+    
+    if mode == "linear":
+        x = np.linspace(space_params["x_lower"] * 2, space_params["x_upper"] * 2, round(np.sqrt(n_samples)))
+        D = np.array(list(product(x, x)))
+        x = D[:,0]
+        y = D[:,1]
+    
+    if mode == "normal":
+        x_loc = (space_params["x_lower"] + space_params["x_upper"]) / 2
+        y_loc = (space_params["y_lower"] + space_params["y_upper"]) / 2
+        x = rng.normal(loc=x_loc, size=n_samples)
+        y = rng.normal(loc=y_loc, size=n_samples)
+    return x,y
+
+
+def generate_data(n_samples, boundary_params, rotation_angle, margin_params, overlap, space_params, seed= 12345, mode= "uniform"):
     """
         n_samples: int. Number of samples to generate (might be lower since we are sampling)
         boundary_params: dict containing displ, freq, amp
@@ -41,16 +63,11 @@ def generate_data(n_samples, boundary_params, rotation_angle, margin_params, ove
         rotation_angle: angle to rotate the decision boundary in degrees
     """
     rng = np.random.default_rng(seed)
-    x = rng.uniform(space_params["x_lower"] * 2, space_params["x_upper"] * 2, n_samples*5)
-    y = rng.uniform(space_params["y_lower"] * 2, space_params["y_upper"] * 2, n_samples*5)
+    x,y = gen_xy(n_samples, space_params, rng, mode)
     
-    # x = np.linspace(space_params["x_lower"] * 2, space_params["x_upper"] * 2, round(np.sqrt(n_samples)))
-    # D = np.array(list(product(x, x)))
-    # x = D[:,0]
-    # y = D[:,1]
-    
-    dec_bound = decision_boundary(x, boundary_params["displ"], boundary_params["freq"], boundary_params["amp"])
-    cl = np.array(["A" if c else "B" for c in y < dec_bound])
+    dec_bound = decision_boundary(x, **boundary_params)
+    cl = np.where(y < dec_bound, "A", "B")
+    # cl = np.array(["A" if c else "B" for c in y < dec_bound])
 
     # brush margin
     dec_up = decision_boundary(
@@ -65,48 +82,40 @@ def generate_data(n_samples, boundary_params, rotation_angle, margin_params, ove
         boundary_params["freq"],
         boundary_params["amp"]
     )
-    r = range(x.shape[0])
-    out_margin_up_pos = [r[i] for i, v in enumerate(y > dec_up) if v]
     out_margin_up_ind = rng.choice(
-        out_margin_up_pos, 
-        np.floor(len(out_margin_up_pos) * margin_params["outmargin_sample"]).astype(int),
+        np.where(y > dec_up)[0], 
+        int(len(y[y > dec_up]) * margin_params["outmargin_sample"]),
         replace = False
-    )
+    ) if len(y[y > dec_up]) > 0 else np.array([])
 
-    margin_pos = [r[i] for i, v in enumerate((y < dec_up) & (y > dec_low)) if v]
+    in_margin_cond = (y < dec_up) & (y > dec_low)
     margin_ind = rng.choice(
-        margin_pos,
-        np.floor(len(margin_pos) * margin_params["margin_sample"]).astype(int),
+        np.where(in_margin_cond)[0],
+        int(len(y[in_margin_cond]) * margin_params["margin_sample"]),
         replace = False
-    )
+    ) if len(y[in_margin_cond]) > 0 else np.array([])
 
-    out_margin_down_pos = [r[i] for i, v in enumerate(y < dec_low) if v]
     out_margin_down_ind = rng.choice(
-        out_margin_down_pos,
-        np.floor(len(out_margin_down_pos) * margin_params["outmargin_sample"]).astype(int),
+        np.where(y < dec_low)[0],
+        int(len(y[y < dec_low]) * margin_params["outmargin_sample"]),
         replace = False
-    )
+    ) if len(y[y < dec_low]) > 0 else np.array([])
 
-    if len(out_margin_up_ind) == 0:
-        out_margin_up_ind = [0]
-    if len(margin_ind) == 0:
-        margin_ind = [0]
-    if len(out_margin_down_ind) == 0:
-        out_margin_down_ind = [0]
-
-    x = np.concat([x[out_margin_up_ind],x[margin_ind],x[out_margin_down_ind]])
-    y = np.concat([y[out_margin_up_ind],y[margin_ind],y[out_margin_down_ind]])
-    cl = np.concat([cl[out_margin_up_ind], cl[margin_ind], cl[out_margin_down_ind]])
+    selected_indices = np.concat([
+        out_margin_up_ind,
+        margin_ind,
+        out_margin_down_ind
+    ])
+    x, y, cl = x[selected_indices], y[selected_indices], cl[selected_indices]
 
     # overlap
-    y[cl == "A"] += overlap
-    y[cl == "B"] -= overlap
+    y[cl == "A"] += overlap / 2
+    y[cl == "B"] -= overlap / 2
     
     # rotate
     x, y = rotate(x, y, rotation_angle)
     
-    r = np.arange(x.shape[0])
-    r = r[(x < space_params["x_upper"]) & (x > space_params["x_lower"]) & (y < space_params["y_upper"]) & (y > space_params["y_lower"])]
+    r = (x < space_params["x_upper"]) & (x > space_params["x_lower"]) & (y < space_params["y_upper"]) & (y > space_params["y_lower"])
     x = x[r]
     y = y[r]
     cl = cl[r]

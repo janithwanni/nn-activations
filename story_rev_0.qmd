@@ -16,12 +16,12 @@ But then he got to talk with model developer and together he wanted to solve the
 ```
 
 ```{python}
-boundary_params = {"displ": 1, "freq": 0.75, "amp": 2}
-n_samples = 1000
-margin_params = {"margin": 5, "margin_sample": 0.31, "outmargin_sample": 1}
+boundary_params = {"displ": 1, "freq": 1, "amp": 2}
+n_samples = 10000
+margin_params = {"margin": 0, "margin_sample": 1, "outmargin_sample": 1}
 space_params = {"x_lower": -10, "x_upper": 10, "y_lower": -10, "y_upper": 10}
-overlap = 2
-rotation_angle=45
+overlap = 0
+rotation_angle=0
 
 d = generate_data(n_samples,
     boundary_params,
@@ -45,14 +45,14 @@ plt.show()
 
 
 ```{python}
-import pandas as pd
-dd = pd.read_csv("train_data.csv")
+# import pandas as pd
+# dd = pd.read_csv("train_data.csv")
 ```
 
 ```{python}
-plt.figure(figsize=(8,8))
-plt.scatter(dd["x"], dd["y"], c = ["red" if v == "A" else "green" for v in dd["class"]], s=10)
-plt.show()
+# plt.figure(figsize=(8,8))
+# plt.scatter(dd["x"], dd["y"], c = ["red" if v == "A" else "green" for v in dd["class"]], s=10)
+# plt.show()
 ```
 
 ```{python}
@@ -69,7 +69,7 @@ model_boundary(model)
 ```
 
 ```{python}
-model = run_model(dd.iloc[:, [0,1]].values, np.array([1.0 if v == "A" else 0.0 for v in dd["class"].values]), epochs=10)
-model_boundary(model)
+# model = run_model(dd.iloc[:, [0,1]].values, np.array([1.0 if v == "A" else 0.0 for v in dd["class"].values]), epochs=10)
+# model_boundary(model)
 ```
 
