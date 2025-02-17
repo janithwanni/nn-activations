@@ -1,0 +1,75 @@
+---
+title: "Activations and circuits, a mathematical intuition"
+---
+
+It's time I did it. I'm going to try my best to explain the concept behind neural networks, activations and my possible vision for circuits, using pictures and **shivers** _maths_.
+
+<!-- This is a reference for myself to understand what is meant by looking at activations.
+Neural networks train by taking in a Nxp matrix of observations and a 1xp outcomes. The architecture of a NN consists of L hidden layers with each having h_l neurons/weights inside them. In between each layer we will be adding a non linear activation function.  -->
+
+The purpose of this documenr is to mathematically prove/discuss that, the non linearity used in neural networks causes a collection of neurons to be dedicated to certain specific tasks of the modeling problem.
+
+What is an activation function and why is it important?
+
+Without an activation function neural networks can not model non linear functions. Increasing the depth and width of a neural network without an activation function can be simplified to a collection of linear equations. Adding neurons to capture jags in a dataset does not make sense in that case as we are not dealing with a model that provides a piecewise function of a collection of linear relationships.
+
+Note: There is a discourse about the importance of zero centered activation functions and that non zero centered activation functions has the possibility of causing the weights to update in a zig-zag pattern due to the entire update gradient being positive. There are counter arguments for this stating that even when it is zero centered it possible for the weights to still follow a zig zag pattern. I will not dive too deep into this.
+
+Why ReLU? well it alleviates the vanishing gradient issue of the sigmoid and tanh functions. The vanishing gradient problem happens when the outputs go really high or low, then the gradient of the activation function goes close to zero, so that the weight gets updated very slowly or can vanish entirely. 
+
+In ReLU we still have that issue but in this case it happens only if all the neuron outputs are less than zero called the dead ReLU problem, where certain neurons become inactive permanently if they keep outputting zero. Basically a dead ReLU is where a neuron's weight is currently at a value that gives out zero and with the gradient being zero and the weight not being updated, the output of that neuron will not be activated ever (or for a long time)
+
+Since we are using ReLU as our activation function, the outputs of a neuron tend to be either zero or a positive real value. Only when the output of a neural network is non-zero will it's output be sent through to the next layer. 
+
+Now the question becomes, can this cause certain neurons to be delegated to performing a set of definable tasks. Or does it take a collection of interconnected neurons for that to happen.
+
+To understand whether neurons were delegated tasks on a spatial level we can try to understand first, for a given neuron what were the areas that it was activated on.
+
+```{python}
+import torch
+import numpy as np
+import matplotlib.pyplot as plt
+import model_utils import *
+
+a = torch.load("model_chkpoint.pth", weights_only=True)
+weights = a['layers.0.weight'].numpy()
+biases = a['layers.0.bias'].numpy()
+
+def make_reg_line(weights, biases, yc = 0):
+    """
+    weights: A array of layer_size x 2
+    biases: A array of layer_size
+
+    Returns: A array of layer_size x 2 indicating intercept and slope
+    """
+    n_neurons  = weights.shape[0]
+    result = np.empty((n_neurons, 2))
+    for i in range(n_neurons):
+        result[i, 0] = -(weights[i,0] / weights[i,1])
+        result[i, 1] = -(biases[i] - yc) / weights[i, 1] # fixing y as 0
+    return result
+
+def plot_reg_line(weights, biases):
+    """
+    weights: A array of layer_size x 2
+    biases: A array of layer_size
+
+    Returns: A list of plots of regression line
+    """
+    n_neurons = weights.shape[0]
+    reg_line = make_reg_line(weights, biases)
+
+    x = np.linspace(-10,10,1000)
+
+    fig = plt.figure()
+    ax = fig.subplots()
+    ax.set_xlim([-10,10])
+    ax.set_ylim([-10,10])
+    for i in range(n_neurons):
+        y = reg_line[i, 0] * x + reg_line[i, 1]  
+        ax.plot(x,y,c=plt.cm.get_cmap("Set3")(i, bytes=True) / 255, label = f"w{i+1}")
+    fig.legend()
+
+    return fig
+```
+

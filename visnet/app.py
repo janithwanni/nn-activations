@@ -50,13 +50,17 @@ app_ui = ui.page_sidebar(
         ui.output_plot(
             "active_areas",
             height = PLOT_DIM, width = PLOT_DIM
+        ),
+        ui.output_plot(
+            "weight_lines",
+            height = PLOT_DIM, width = PLOT_DIM
         )
     ),
     ui.div(
         ui.input_select("layer_select", "Select layer", []),
         ui.output_plot(
             "l1_activations",
-            height = PLOT_DIM, width = "80vw"
+            height ="80vw", width = "80vw"
         ),
     ),
     title = "VisNet",
@@ -120,6 +124,7 @@ def server(input, output, session):
             epochs=epochs,
             layer_sizes = layer_sizes
         )
+        torch.save(model.state_dict(), "visnet/model_chkpoint.pth")
         return model
 
     @reactive.calc
@@ -151,8 +156,10 @@ def server(input, output, session):
         )
 
     @render.plot
-    def l2_activations():
-        return None
+    def weight_lines():
+        weights = model().state_dict()["layers.0.weight"].numpy()
+        biases = model().state_dict()["layers.0.bias"].numpy()
+        return visobj().plot_reg_line(weights, biases)
     
     @render.plot
     def active_areas():
@@ -170,11 +177,11 @@ def server(input, output, session):
 
     @render.text
     def avg_loss():
-        return f"avg loss {round(model().loss_history[-1], 2)}"
+        return f"final loss {round(model().loss_history[-1], 2)}"
     
     @render.text
     def avg_metric():
-        return f"avg acc {round(model().metric_history[-1], 2)}"
+        return f"final accuracy {round(model().metric_history[-1], 2)}"
     
 
 app = App(app_ui, server, debug=False)

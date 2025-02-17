@@ -4,6 +4,8 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from itertools import product
+import logging
+lg = logging.getLogger('uvicorn.info').getChild("model_utils")
 
 DEVICE = "cpu"
 torch.set_default_device('cpu')
@@ -13,33 +15,28 @@ class InterpretableNN(nn.Module):
         super(InterpretableNN, self).__init__()
         
         self.layer_sizes = layer_sizes
-        self.layers = [[None] for i in range(len(layer_sizes))]
+        self.layers = nn.ModuleList()
 
-        self.layers[0] = [
-            nn.Linear(2, layer_sizes[0]),
-            nn.ReLU()
-        ]
+        self.layers.append(nn.Linear(2, layer_sizes[0]))
+        self.layers.append(nn.ReLU())
 
         for i in range(1, len(layer_sizes)):
-            self.layers[i] = [
-                nn.Linear(layer_sizes[(i-1)], layer_sizes[i]),
-                nn.ReLU()
-            ]
+            self.layers.append(nn.Linear(layer_sizes[(i-1)], layer_sizes[i]))
+            self.layers.append(nn.ReLU())
+        
+        self.layers.append(nn.Linear(layer_sizes[-1], 1))
+        self.layers.append(nn.Sigmoid())
 
-        self.output = nn.Linear(layer_sizes[-1], 1)
         self.activations = {}
         self.loss_history = []
         self.metric_history = []
 
     def forward(self, x):
         self.activations = {}
-        for i, nl in enumerate(self.layers):
-            for nly in nl:
-                x = nly(x)
-            self.activations[f"h{(i+1)}"] = x
-        
-        x = self.output(x)
-        x = nn.Sigmoid()(x)
+        for i, l in enumerate(self.layers):
+            x = l(x)
+            if i % 2 != 1: # odd number of layers are activations
+                self.activations[f"h{(i+1)}"] = x
         return x
 
 def run_model(X, y, epochs = 100, layer_sizes = [4, 4], torch_seed = 123):
