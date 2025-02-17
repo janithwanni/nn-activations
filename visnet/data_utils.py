@@ -35,8 +35,8 @@ def generate_xy(n_samples, space_params, rng, mode):
     mode: can be either 'uniform', 'linear', 'normal'
     """
     if mode == "uniform":
-        x = rng.uniform(space_params["x_lower"], space_params["x_upper"], n_samples)
-        y = rng.uniform(space_params["y_lower"], space_params["y_upper"], n_samples)
+        x = rng.uniform(space_params["x_lower"] * 3, space_params["x_upper"] * 3, n_samples*10)
+        y = rng.uniform(space_params["y_lower"] * 3, space_params["y_upper"] * 3, n_samples*10)
     
     if mode == "linear":
         x = np.linspace(space_params["x_lower"], space_params["x_upper"], round(np.sqrt(n_samples)))
@@ -47,8 +47,8 @@ def generate_xy(n_samples, space_params, rng, mode):
     if mode == "normal":
         x_loc = (space_params["x_lower"] + space_params["x_upper"]) / 2
         y_loc = (space_params["y_lower"] + space_params["y_upper"]) / 2
-        x = rng.normal(loc=x_loc, size=n_samples)
-        y = rng.normal(loc=y_loc, size=n_samples)
+        x = rng.normal(loc=x_loc, size=n_samples, scale = 3)
+        y = rng.normal(loc=y_loc, size=n_samples, scale = 3)
     return x,y
 
 def filter_margin(
@@ -64,19 +64,23 @@ def filter_margin(
     theta = np.radians(rotation_angle)
     x_push = -np.sin(theta) * margin
     y_push = np.cos(theta) * margin
+    
     x_up = x + x_push
     x_down = x - x_push
     dec_up = dec_bound + y_push
     dec_down = dec_bound - y_push
 
-    above_margin_cond = (y > dec_up) & (x > x_up)
-    in_margin_cond = (y < dec_up) & (x < x_up) & (y > dec_down) & (x > x_down)
-    below_margin_cond = (y < dec_down) & (x < x_down)
+    above_margin_cond = (y > dec_up) & (x >= x_up)
+    below_margin_cond = (y < dec_down) & (x <= x_down)
+    # in_margin_cond = (y <= dec_up) & (x >= x_up) & (y >= dec_down) & (x <= x_down)
+    in_margin_cond = (~above_margin_cond) & (~below_margin_cond)
+    
     above_margin_ind = rng.choice(
         np.where(above_margin_cond)[0],
         int(len(y[above_margin_cond]) * outmargin_sample),
         replace = False
     ) if len(y[above_margin_cond]) > 0 else np.array([])
+
     margin_ind = rng.choice(
         np.where(in_margin_cond)[0],
         int(len(y[in_margin_cond]) * margin_sample),
@@ -127,7 +131,7 @@ def generate_data(
     cl = np.where(y < dec_bound, "A", "B")
     x_r, y_r = rotate(x, y, rotation_angle)
     
-    # we aren't cropping
+    # we aren't cropping, scratch that we are to make sense of it
 
     selected_indices = filter_margin(x_r, y_r, dec_bound_r, rotation_angle, rng, **margin_params)
     
@@ -135,6 +139,9 @@ def generate_data(
 
     x_o, y_o = overlap_sides(x_f,y_f, cl_f, rotation_angle, overlap)
 
+    crop_inds = (x_o >= space_params["x_lower"]) & (x_o <= space_params["x_upper"]) & (y_o >= space_params["y_lower"]) & (y_o <= space_params["y_upper"])
+    x_r, y_r, cl_r = x_o[crop_inds], y_o[crop_inds], cl_f[crop_inds]
+
     return {
-        "x": x_o, "y": y_o, "class": cl_f
+        "x": x_r, "y": y_r, "class": cl_r
     }

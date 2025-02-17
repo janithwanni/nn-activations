@@ -5,59 +5,40 @@ from shiny import ui, App, render, reactive, req
 from data_utils import *
 from model_utils import *
 from neuron_plot import *
+from ui import data_opts, model_opts
 
 PLOT_DIM = "40vh"
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
         # TODO: Add an accordion to group the sliders
-        ui.input_slider(
-            "n_samples",
-            label="Number of samples",
-            min=100,max=10000,step=100,value=5000
-        ),
-        ui.input_slider(
-            "displ",
-            label="Displacement",
-            min=0,max=5,step=0.01,value=0
-        ),
-        ui.input_slider(
-            "freq",
-            label="Frequency",
-            min=0,max=5,step=0.01,value=2
-        ),
-        ui.input_slider(
-            "amp",
-            label="Amplitude",
-            min=0,max=5,step=0.01,value=2
-        ),
-        ui.input_slider(
-            "margin",
-            label = "Margin",
-            min=0,max=5,step=0.01,value=1
-        ),
-        ui.input_slider(
-            "angle",
-            label = "Rotation angle",
-            min=0,max=360,step=15,value=45
-        ),
-        ui.input_slider(
-            "outmargin_sample",
-            label = "Out of margin sampling rate",
-            min=0,max=1,step=0.01,value=1
-        ),
-        ui.input_slider(
-            "inmargin_sample",
-            label = "In margin sampling rate",
-            min=0,max=1,step=0.01,value=1
-        ),
-        ui.input_slider(
-            "overlap",
-            label = "Overlap",
-            min=0,max=5,step=0.01,value=0
+        ui.accordion(
+            ui.accordion_panel(
+                "Data generation options",
+                *data_opts,
+            ),
+            ui.accordion_panel(
+                "Model building options",
+                *model_opts
+            ),
+            open = "Model building options"
         )
     ),
-    ui.layout_columns(
+    ui.div(
+        ui.output_plot(
+            "loss_history",
+            height = "20vh", width = "30vw"
+        ),
+        ui.output_plot(
+            "metric_history",
+            height = "20vh", width = "30vw"
+        ),
+        ui.row(    
+            ui.div(ui.output_text("avg_loss"), fill = False),
+            ui.div(ui.output_text("avg_metric"), fill = False)
+        )
+    ),
+    ui.div(
         ui.output_plot(
             "data",
             height = PLOT_DIM, width = PLOT_DIM
@@ -69,19 +50,14 @@ app_ui = ui.page_sidebar(
         ui.output_plot(
             "active_areas",
             height = PLOT_DIM, width = PLOT_DIM
-        ),
-        col_widths = [4]*3
+        )
     ),
-    ui.layout_columns(
+    ui.div(
+        ui.input_select("layer_select", "Select layer", []),
         ui.output_plot(
             "l1_activations",
-            height = PLOT_DIM, width = "100%"
+            height = PLOT_DIM, width = "80vw"
         ),
-        ui.output_plot(
-            "l2_activations",
-            height = PLOT_DIM, width = "100%"
-        ),
-        col_widths=[6]*2
     ),
     title = "VisNet",
     fillable = True, fillable_mobile = True
@@ -117,15 +93,39 @@ def server(input, output, session):
         )
     
     @reactive.calc
+    def layers():
+        neurons = input.num_neurons()
+        layer_sizes = [int(x) for x in neurons.split(",") if x != '']
+        return layer_sizes
+    
+    @reactive.effect
+    def update_layer_selector():
+        ui.update_select(
+            "layer_select",
+            choices = {
+                i: f"Layer {i+1}" for i in range(len(layers()))
+            }
+        )
+    
+    @reactive.calc
     def model():
         d = gen_data()
+        epochs = input.epochs()
+        layer_sizes = layers()
         data = np.vstack([d["x"],d["y"]]).transpose()
-        model = run_model(data, np.array([1.0 if v == "A" else 0.0 for v in d["class"]]), epochs=10)
+        y = np.array([1.0 if v == "A" else 0.0 for v in d["class"]])
+        model = run_model(
+            data,
+            y,
+            epochs=epochs,
+            layer_sizes = layer_sizes
+        )
         return model
 
     @reactive.calc
-    def activations():
-        return plot_activations(model(), layer_size=4)
+    def visobj():
+        visobj = ModelVis(model(), -10, 10, 10000)
+        return visobj
 
     @render.plot
     def data():
@@ -133,6 +133,8 @@ def server(input, output, session):
         fig = plt.figure()
         ax = fig.subplots()
         ax.scatter(x=D["x"],y=D["y"],c=np.where(D["class"] == "A", 1,0))
+        ax.set_xlim([-10, 10])
+        ax.set_ylim([-10, 10])
         return fig
     
     @render.plot
@@ -142,14 +144,37 @@ def server(input, output, session):
 
     @render.plot
     def l1_activations():
-        return activations()[0]
+        l = input.layer_select()
+        req(l)
+        return visobj().plot_activations(
+            int(l)+1, layers()[int(l)]
+        )
 
     @render.plot
     def l2_activations():
-        return activations()[1]
+        return None
     
     @render.plot
     def active_areas():
-        return plot_active_areas(model(), layer_size=4)
+        return visobj().plot_active_areas(len(layers()))
+
+    @render.plot
+    def loss_history():
+        epochs = input.epochs()
+        return visobj().plot_loss_history(epochs)
+
+    @render.plot
+    def metric_history():
+        epochs = input.epochs()
+        return visobj().plot_metric_history(epochs)
+
+    @render.text
+    def avg_loss():
+        return f"avg loss {round(model().loss_history[-1], 2)}"
+    
+    @render.text
+    def avg_metric():
+        return f"avg acc {round(model().metric_history[-1], 2)}"
+    
 
 app = App(app_ui, server, debug=False)
