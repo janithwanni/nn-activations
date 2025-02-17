@@ -1,0 +1,8 @@
+.history_plots {
+    display: flex;
+    flex-direction: row;
+}
+
+.main_plots {
+    display: flex;
+}

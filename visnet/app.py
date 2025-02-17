@@ -6,6 +6,7 @@ from data_utils import *
 from model_utils import *
 from neuron_plot import *
 from ui import data_opts, model_opts
+from pathlib import Path
 
 PLOT_DIM = "40vh"
 
@@ -24,19 +25,23 @@ app_ui = ui.page_sidebar(
             open = "Model building options"
         )
     ),
-    ui.div(
-        ui.output_plot(
-            "loss_history",
-            height = "20vh", width = "30vw"
+    ui.head_content(ui.include_css(Path(__file__).parent / "main.css")),
+    ui.accordion(
+        ui.accordion_panel(
+            "History",
+            ui.div(
+                ui.output_plot(
+                    "loss_history",
+                    height = "20vh", width = "30vw"
+                ),
+                ui.output_plot(
+                    "metric_history",
+                    height = "20vh", width = "30vw"
+                ),
+                class_ = "history_plots"
+            )
         ),
-        ui.output_plot(
-            "metric_history",
-            height = "20vh", width = "30vw"
-        ),
-        ui.row(    
-            ui.div(ui.output_text("avg_loss"), fill = False),
-            ui.div(ui.output_text("avg_metric"), fill = False)
-        )
+        open = False
     ),
     ui.div(
         ui.output_plot(
@@ -54,14 +59,13 @@ app_ui = ui.page_sidebar(
         ui.output_plot(
             "weight_lines",
             height = PLOT_DIM, width = PLOT_DIM
-        )
+        ),
+        class_ = "main_plots"
     ),
     ui.div(
         ui.input_select("layer_select", "Select layer", []),
-        ui.output_plot(
-            "l1_activations",
-            height ="80vw", width = "80vw"
-        ),
+        ui.output_ui("layer_activations"),
+        class_ = "layer_act_plots"
     ),
     title = "VisNet",
     fillable = True, fillable_mobile = True
@@ -140,13 +144,25 @@ def server(input, output, session):
         ax.scatter(x=D["x"],y=D["y"],c=np.where(D["class"] == "A", 1,0))
         ax.set_xlim([-10, 10])
         ax.set_ylim([-10, 10])
+        ax.set_title("Dataset")
         return fig
     
     @render.plot
     def model_bound():
-        fig = model_boundary(model())
+        fig = visobj().model_boundary()
         return fig
-
+    
+    @render.ui
+    def layer_activations():
+        l = input.layer_select()
+        layer_size = layers()[int(l)]
+        ncols = visobj().NCOLS
+        nrows = np.ceil(layer_size / ncols).astype(int)
+        height = nrows * 20
+        return ui.output_plot(
+            "l1_activations",
+            height = f"{height}vh", width = "80vw"
+        )
     @render.plot
     def l1_activations():
         l = input.layer_select()
@@ -174,14 +190,6 @@ def server(input, output, session):
     def metric_history():
         epochs = input.epochs()
         return visobj().plot_metric_history(epochs)
-
-    @render.text
-    def avg_loss():
-        return f"final loss {round(model().loss_history[-1], 2)}"
-    
-    @render.text
-    def avg_metric():
-        return f"final accuracy {round(model().metric_history[-1], 2)}"
     
 
 app = App(app_ui, server, debug=False)

@@ -66,8 +66,9 @@ def plot_reg_line(weights, biases):
     ax.set_xlim([-10,10])
     ax.set_ylim([-10,10])
     for i in range(n_neurons):
-        y = reg_line[i, 0] * x + reg_line[i, 1]  
-        ax.plot(x,y,c=plt.cm.get_cmap("Set3")(i, bytes=True) / 255, label = f"w{i+1}")
+        y = reg_line[i, 0] * x + reg_line[i, 1]
+        color = [c / 255 for c in plt.cm.get_cmap("Dark2")(i, bytes=True)]
+        ax.plot(x,y,c=color, label = f"w{i+1}")
     fig.legend()
 
     return fig

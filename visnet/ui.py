@@ -52,7 +52,7 @@ model_opts = [
     ui.input_slider(
         "epochs",
         label = "Epochs",
-        min = 10, max = 200, step = 10, value = 100
+        min = 10, max = 200, step = 10, value = 60
     ),
     ui.input_text(
         "num_neurons",
