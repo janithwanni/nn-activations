@@ -4,7 +4,7 @@ data_opts = [
     ui.input_slider(
         "n_samples",
         label="Number of samples",
-        min=100,max=10000,step=100,value=5000
+        min=100,max=10000,step=100,value=6000
     ),
     ui.input_slider(
         "displ",
@@ -57,6 +57,6 @@ model_opts = [
     ui.input_text(
         "num_neurons",
         label = "Number of neurons",
-        value = "5"
+        value = "35"
     )
 ]

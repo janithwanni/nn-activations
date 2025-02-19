@@ -9,6 +9,7 @@ from ui import data_opts, model_opts
 from pathlib import Path
 
 PLOT_DIM = "40vh"
+PLOT_WIDTH = "60vw"
 
 app_ui = ui.page_sidebar(
     ui.sidebar(
@@ -39,28 +40,34 @@ app_ui = ui.page_sidebar(
                     height = "20vh", width = "30vw"
                 ),
                 class_ = "history_plots"
-            )
+            ),
+            {"data-id" : "main-plots-container"}
         ),
         open = False
     ),
-    ui.div(
-        ui.output_plot(
-            "data",
-            height = PLOT_DIM, width = PLOT_DIM
-        ),
-        ui.output_plot(
-            "model_bound",
-            height = PLOT_DIM, width = PLOT_DIM
-        ),
-        ui.output_plot(
-            "active_areas",
-            height = PLOT_DIM, width = PLOT_DIM
-        ),
-        ui.output_plot(
-            "weight_lines",
-            height = PLOT_DIM, width = PLOT_DIM
-        ),
-        class_ = "main_plots"
+    ui.accordion(
+        ui.accordion_panel(
+            "Model diagnostics",
+            ui.div(
+                ui.output_plot(
+                    "data",
+                    height = PLOT_DIM, width = PLOT_WIDTH
+                ),
+                ui.output_plot(
+                    "model_bound",
+                    height = PLOT_DIM, width = PLOT_WIDTH
+                ),
+                ui.output_plot(
+                    "active_areas",
+                    height = PLOT_DIM, width = PLOT_WIDTH
+                ),
+                ui.output_plot(
+                    "weight_lines",
+                    height = PLOT_DIM, width = PLOT_WIDTH
+                ),
+                class_ = "main_plots"
+            )
+        )
     ),
     ui.div(
         ui.input_select("layer_select", "Select layer", []),
@@ -128,7 +135,7 @@ def server(input, output, session):
             epochs=epochs,
             layer_sizes = layer_sizes
         )
-        torch.save(model.state_dict(), "visnet/model_chkpoint.pth")
+        # torch.save(model.state_dict(), "visnet/model_chkpoint.pth")
         return model
 
     @reactive.calc
@@ -154,11 +161,12 @@ def server(input, output, session):
     
     @render.ui
     def layer_activations():
+        req(input.layer_select())
         l = input.layer_select()
         layer_size = layers()[int(l)]
         ncols = visobj().NCOLS
         nrows = np.ceil(layer_size / ncols).astype(int)
-        height = nrows * 20
+        height = nrows * 30
         return ui.output_plot(
             "l1_activations",
             height = f"{height}vh", width = "80vw"

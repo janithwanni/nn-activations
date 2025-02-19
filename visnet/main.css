@@ -5,4 +5,14 @@
 
 .main_plots {
     display: flex;
+    flex-direction: row;
+    overflow-x: scroll;
+    height: 40vh;
+    width: 100vw;
+}
+/* Finicky but will do for now */
+div[data-value="Model diagnostics"] div.accordion-body {
+    overflow-x: scroll !important;
+    width: 80vw;
+    height: 50vh;
 }

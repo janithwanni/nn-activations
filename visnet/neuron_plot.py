@@ -43,12 +43,14 @@ class ModelVis():
                 scatter = ax.scatter(
                     self.D_arr[:,0],
                     self.D_arr[:,1],
-                    c=act[:, ((i*ncols)+j)],
+                    c=np.round(act[:, ((i*ncols)+j)]),
                     alpha = 0.6,
                     cmap="Paired",
                     s = 8
                 )
-                fig.colorbar(scatter, ax=ax)
+                handles, _ = scatter.legend_elements(prop="colors")
+                legend1 = ax.legend(handles, ["Not Active", "Active"], loc="lower right", fontsize = "xx-small")
+                ax.add_artist(legend1)
                 ax.set_title(f'Weight {(i*ncols)+j+1}')
                 self.set_labels(ax)
         fig.suptitle(title)
