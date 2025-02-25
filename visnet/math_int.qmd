@@ -74,3 +74,12 @@ def plot_reg_line(weights, biases):
     return fig
 ```
 
+So what did we learn from this exercise?
+
+Yes the first layer weights can be formed as regression lines but the intuition of using the number of jags does not necessarily translate well. 
+
+The UAT talks about how there might be a single layer neuron capable of approximating a continuous function
+
+However when the gap between the spaces are increased then the model resorts to fitting linear lines
+
+Changing the angle has an effect as well interestingly.
