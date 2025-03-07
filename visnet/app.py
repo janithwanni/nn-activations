@@ -74,6 +74,11 @@ app_ui = ui.page_sidebar(
         ui.output_ui("layer_activations"),
         class_ = "layer_act_plots"
     ),
+    ui.div(
+        ui.input_select("result_select", "Select intermediate result", []),
+        ui.output_ui("result_plots_container"),
+        class_ = "result_plot_outputs"
+    ),
     title = "VisNet",
     fillable = True, fillable_mobile = True
 )
@@ -119,6 +124,12 @@ def server(input, output, session):
             "layer_select",
             choices = {
                 i: f"Layer {i+1}" for i in range(len(layers()))
+            }
+        )
+        ui.update_select(
+            "result_select",
+            choices = {
+                val: f"{val}" for i, val in enumerate(model().results.keys())
             }
         )
     
@@ -178,7 +189,30 @@ def server(input, output, session):
         return visobj().plot_activations(
             int(l)+1, layers()[int(l)]
         )
-
+    @render.ui
+    def result_plots_container():
+        req(input.result_select())
+        layer_key = input.result_select()
+        # print("=======")
+        # print(layer_key)
+        # print(model().results[layer_key].shape[1])
+        # print("========")
+        ncols = visobj().NCOLS
+        layer_size = model().results[layer_key].shape[1]
+        nrows = np.ceil(layer_size / ncols).astype(int)
+        height = nrows * 30
+        return ui.output_plot(
+            "result_outputs",
+            height = f"{height}vh", width = "80vw"
+        )
+    @render.plot
+    def result_outputs():
+        l = input.result_select()
+        req(l)
+        return visobj().plot_results(
+            model().results[l].cpu().detach().numpy(),
+            layer_size = model().results[l].shape[1]
+        )
     @render.plot
     def weight_lines():
         weights = model().state_dict()["layers.0.weight"].numpy()

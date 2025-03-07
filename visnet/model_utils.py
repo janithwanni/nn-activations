@@ -26,6 +26,7 @@ class InterpretableNN(nn.Module):
         self.layers.append(nn.Sigmoid())
 
         self.activations = {}
+        self.results = {}
         self.loss_history = []
         self.metric_history = []
 
@@ -33,6 +34,22 @@ class InterpretableNN(nn.Module):
         self.activations = {}
         for i, l in enumerate(self.layers):
             x = l(x)
+
+            if isinstance(l, nn.Linear):
+                label = "Linear"
+            if isinstance(l, nn.ReLU):
+                label = "ReLu"
+            if isinstance(l, nn.Sigmoid):
+                label = "Sigmoid"
+            
+            if i == (len(self.layers) - 3):
+                a = x.detach().clone()
+                weight_layer = list(self.layers[i+1].parameters())
+                
+                for i in range(x.shape[1]):
+                    a[:, i] = a[:, i] * weight_layer[0][0, i] + weight_layer[1][0]
+                self.results[f"interim-{i}"] = a
+            self.results[f"{label}-{i}"] = x
             if i % 2 != 1: # odd number of layers are activations
                 self.activations[f"h{int((i+2)/2)}"] = x
         return x

@@ -20,6 +20,7 @@ class ModelVis():
         self.activations = model.activations
         self.loss_history = model.loss_history
         self.metric_history = model.metric_history
+        self.results = model.results
         
         self.NCOLS = 5
 
@@ -61,6 +62,33 @@ class ModelVis():
             (self.activations[f"h{layer_num}"] > 0).astype(int),
             layer_size
         )
+    
+    # TODO: This is copied and should be refactored better
+    def plot_results(self, res, layer_size):
+
+        ncols = self.NCOLS
+        nrows = np.ceil(layer_size / ncols).astype(int)
+
+        fig, axes = plt.subplots(nrows, ncols, figsize=(20, 5))
+        
+        for i in range(nrows):
+            for j in range(ncols):
+                if ((i*ncols)+j) >= res.shape[1]:
+                    break
+                ax = axes[i,j] if nrows != 1 else axes[j]
+                scatter = ax.scatter(
+                    self.D_arr[:,0],
+                    self.D_arr[:,1],
+                    c=np.round(res[:, ((i*ncols)+j)]),
+                    alpha = 0.6,
+                    cmap="RdYlBu",
+                    s = 8,
+                    vmin = -2, vmax = 2
+                )
+                fig.colorbar(scatter, ax=ax)
+                ax.set_title(f'Weight {(i*ncols)+j+1}')
+                self.set_labels(ax)
+        return fig   
 
     def plot_active_areas(self, num_layers):
         act_ls = None
@@ -159,6 +187,7 @@ class ModelVis():
         return fig
     
     def model_boundary(self):
+        plt.close()
         fig = plt.figure()
         ax = fig.subplots()
         scatter = ax.scatter(

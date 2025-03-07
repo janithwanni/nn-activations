@@ -57,6 +57,11 @@ model_opts = [
     ui.input_text(
         "num_neurons",
         label = "Number of neurons",
-        value = "35"
+        value = "5"
+    ),
+    ui.input_numeric(
+        "seed",
+        label = "Seed",
+        value = 12345
     )
 ]
