@@ -2,3 +2,5 @@ venv/
 *_files/
 *_site/
 renv/
+visnet/images/
+visnet/checkpoints/
