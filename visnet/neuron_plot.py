@@ -5,7 +5,7 @@ import torch
 from model_utils import DEVICE
 
 class ModelVis():
-    def __init__(self, model, lower, upper, n_samples):
+    def __init__(self, model, lower = -10, upper = 10, n_samples = 10000):
         grid_size = round(np.sqrt(n_samples))
         x = np.linspace(lower, upper, grid_size)
         D = np.array(list(product(x, x)))
@@ -186,14 +186,18 @@ class ModelVis():
         ax.set_title("Regression from layer 1 weights")
         return fig
     
-    def model_boundary(self):
+    def model_boundary(self, x1 = None, x2 = None, pred = None):
+        x1 = self.D_arr[:,0] if x1 is None else x1
+        x2 = self.D_arr[:,1] if x2 is None else x2
+        pred = self.Y.cpu().detach().numpy() if pred is None else pred
         plt.close()
+        plt.ioff()        
         fig = plt.figure()
         ax = fig.subplots()
         scatter = ax.scatter(
-            self.D_arr[:,0],
-            self.D_arr[:,1], 
-            c=self.Y.cpu().detach().numpy(), 
+            x1,
+            x2, 
+            c=pred, 
             alpha=0.6, 
             cmap="RdYlBu",
             s=8

@@ -4,9 +4,11 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 import numpy as np
 from itertools import product
+import numpy as np
+from sklearn.metrics import f1_score, accuracy_score
 
 DEVICE = "cpu"
-torch.set_default_device('cpu')
+torch.set_default_device(DEVICE)
 
 class InterpretableNN(nn.Module):
     def __init__(self, layer_sizes):
@@ -63,7 +65,8 @@ def run_model(X, y, epochs = 100, layer_sizes = [4, 4], torch_seed = 123):
     dataloader = torch.utils.data.DataLoader(
         dataset,
         batch_size=round(np.sqrt(X_tensor.shape[0])),
-        shuffle=True
+        shuffle=True,
+        generator = torch.Generator(device=DEVICE).manual_seed(torch_seed)
     )
 
     # Define model
@@ -92,3 +95,35 @@ def run_model(X, y, epochs = 100, layer_sizes = [4, 4], torch_seed = 123):
         model.loss_history.append(loss_epoch / len(dataloader.dataset))
     return model
 
+def fit_single_model(seed, n_neurons, train_df):
+    epochs = 100
+    layer_sizes = [n_neurons]
+
+    data = train_df.loc[:, ["x", "y"]].values
+    y = np.array([1.0 if v == "A" else 0.0 for v in train_df.loc[:, "class"].values.tolist()])
+    model = run_model(
+        data,
+        y,
+        epochs=epochs,
+        layer_sizes = layer_sizes,
+        torch_seed=seed
+    )
+
+    return model
+
+def predict(model, df):
+    D_tensor = torch.tensor(df.loc[:, ["x", "y"]].values, dtype=torch.float32, device = DEVICE)
+    preds = (model(D_tensor) > 0.5).int().cpu().detach().numpy().tolist()
+    # preds = ["A" if v == 1.0 else "B" for v in preds]
+    return preds 
+
+def evaluate(model, df):
+  # get predictions 
+  preds = predict(model, df)
+  ground = [1 if v == "A" else 0 for v in df.loc[:, "class"].values.tolist()]
+
+  # get f1 score 
+  f_val = f1_score(preds,ground)
+  # get accuracy 
+  accuracy = accuracy_score(preds, ground)
+  return {"f": f_val, "acc": accuracy}

@@ -1,0 +1,124 @@
+---
+title: "State of the art is gambling for academics"
+---
+
+Neural networks are good function approximaters (upto a certain extent).
+
+In this article I will show how chasing after the state of the art is a gamble. This has been observed in many kaggle competitions but i'm going to dive a bit more deeper into it as well. 
+
+First let's start with a simple dataset that which we know the true population of. 
+
+```{python}
+from data_utils import *
+from model_utils import *
+from neuron_plot import *
+rng = np.random.default_rng(12345) # overall seed 
+import pandas as pd
+```
+
+```{python}
+import os
+
+if not os.path.exists("df.csv"):
+    print("couldn't file df.csv")
+    n_samples = 6000
+    displ = 0
+    freq = 0.5
+    amp = 2
+    margin = 1
+    inmargin_sample = 1
+    outmargin_sample = 1
+    angle = 45
+    overlap = 0
+
+    data_dict = generate_data(
+                n_samples, 
+                {"displ":displ,"freq":freq,"amp":amp},
+                {"margin":margin, "margin_sample": inmargin_sample, "outmargin_sample": outmargin_sample},
+                {"x_upper":10,"x_lower":-10, "y_upper":10,"y_lower":-10},
+                angle,
+                overlap,
+                seed = 12345
+            )
+
+    df = pd.DataFrame(data_dict)
+    df.to_csv("df.csv", index=False)
+
+    # generate indices for training testing split
+    sample_prob = 0.4
+    split_indices = rng.choice(2, size = df.shape[0], p = [1- sample_prob, sample_prob])
+    train_indices = np.arange(df.shape[0])[split_indices == 0]
+    test_indices = np.arange(df.shape[0])[split_indices == 1]
+
+    train_df = df.iloc[train_indices, :]
+    test_df = df.iloc[test_indices, :]
+
+    train_df.to_csv("train_df.csv", index=False)
+    test_df.to_csv("test_df.csv", index=False)
+
+print("reading existing csvs")
+df = pd.read_csv("df.csv")
+train_df = pd.read_csv("train_df.csv")
+test_df = pd.read_csv("test_df.csv")
+```
+
+```{python}
+fig = plt.figure()
+ax = fig.subplots()
+ax.scatter(x=df.loc[:, "x"],y=df.loc[:, "y"],c=np.where(df.loc[:,"class"] == "A", 1,0))
+ax.set_xlim([-10, 10])
+ax.set_ylim([-10, 10])
+ax.set_title("True Dataset")
+
+fig = plt.figure()
+ax = fig.subplots()
+ax.scatter(x=train_df.loc[:, "x"],y=train_df.loc[:, "y"],c=np.where(train_df.loc[:,"class"] == "A", 1,0))
+ax.set_xlim([-10, 10])
+ax.set_ylim([-10, 10])
+ax.set_title("Training Dataset")
+
+fig = plt.figure()
+ax = fig.subplots()
+ax.scatter(x=test_df.loc[:, "x"],y=test_df.loc[:, "y"],c=np.where(test_df.loc[:,"class"] == "A", 1,0))
+ax.set_xlim([-10, 10])
+ax.set_ylim([-10, 10])
+ax.set_title("Testing Dataset")
+```
+
+Now that we see the dataset, let's start with a simple single layer neural network. 
+
+How many neurons should be there. Some would visually think it should be 5. Others might consider a 4 as well. 
+
+```{python}
+four_model = fit_single_model(12345, 4, train_df)
+five_model = fit_single_model(12345, 5, train_df)
+```
+
+We will evaluate how good each model is based on 
+
+- the f1 score on the testing set
+- the average accuracy on the testing set
+- visually the model boundary on the entire data space 
+
+```{python}
+four_evals = evaluate(four_model, test_df)
+five_evals = evaluate(five_model, test_df)
+
+print(four_evals["f"], four_evals["acc"])
+print(five_evals["f"], five_evals["acc"])
+```
+
+```{python}
+ModelVis(four_model).model_boundary()
+```
+
+```{python}
+ModelVis(five_model).model_boundary()
+```
+
+Looks like the two neuron model can't really fit the model. And neither can the five neuron model. 
+
+Or is that the actual case?
+
+Notice how in the previous model fitting instances we fixed the seed for these models. Since the model's learning process is based on a random initialization followed by a slow descent. 
+
